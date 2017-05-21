@@ -1,0 +1,123 @@
+
+######################################################################################
+from random import randint
+
+REGEX_args = '(?<=var args = ).+(?=\s*<\/script>)'
+REGEX_videos = '(?<=var videos = ).+(?=\s*videojs)'
+REGEX_MP4UPLOAD = Regex('(?<="file": ")https:.*(?=")')
+
+BASE_URL = "https://www.masterani.me"
+
+
+
+######################################################################################
+
+def MetadataObjectForURL(url):
+
+    Log('Getting metadata for :' + url)
+    id = Regex('(?<=watch\/)\d+(?=-)').search(url).group()
+    episodeNum = int(Regex('(?<=\/)\d+$').search(url).group())
+    show = JSON.ObjectFromURL(BASE_URL + '/api/anime/{id}/detailed'.format(id=id))
+    #rand = randint(0,show.get('wallpapers').length)
+    #show_art = ("https://cdn.masterani.me/wallpaper/0/" + show.get('wallpapers')[rand].get('file'))
+    show_art = ("https://cdn.masterani.me/wallpaper/0/" + show.get('wallpapers')[0].get('file'))
+    show_rating = float(show.get('info').get('score')) * 2
+    episode = show.get('episodes')[episodeNum-1]
+    show_summary = episode.get('info').get('description')
+    ep_title = episode.get('info').get('title')
+    show_date = Datetime.ParseDate(episode.get('info').get('aired')) if episode.get('info').get('aired') is not None else Datetime.ParseDate(show.get('info').get('started_airing_date'))
+    duration = int(episode.get('info').get('duration')) * 60000 if episode.get('info').get('duration') is not None else int(show.get('info').get('episode_length')) * 60000
+    #Resource.ContentsOfURLWithFallback([, fallback]),
+    show_thumb = ("https://cdn.masterani.me/episodes/" + episode.get('thumbnail')) if episode.get('thumbnail') is not None else 'icon-cover.png'
+    return EpisodeObject(
+        title = ep_title,
+        show = show.get('info').get('title'),
+        summary = show_summary,
+        originally_available_at = show_date,
+        index = episodeNum,
+        thumb = show_thumb,
+        art = show_art,
+        rating = show_rating,
+        duration = duration#,
+        #source_title = show_source
+        )
+
+######################################################################################
+
+def MediaObjectsForURL(url):
+
+    page_data = HTML.StringFromElement(HTML.ElementFromURL(url))
+    jsonString = Regex(REGEX_args).search(page_data).group()
+    Log(jsonString)
+    jsonStringFixed = jsonString.replace('anime: {', '"anime:": {').replace('mirrors: [', '"mirrors": [').replace('auto_update: [', '"auto_update": [')
+    Log("Fixing json string: " + jsonStringFixed)
+    sources = JSON.ObjectFromString(jsonStringFixed)
+    mirrors = sources.get('mirrors')
+
+
+    if mirrors:
+        return[
+            MediaObject(
+                optimized_for_streaming = True,
+                container = Container.MP4,
+                audio_channels = 2,
+                video_codec = VideoCodec.H264,
+                audio_codec = AudioCodec.AAC,
+                video_resolution = mirror.get('quality'),
+                parts = [PartObject(key=Callback(PlayVideo, url = mirror.get('host').get('embed_prefix') + mirror.get('embed_id')+ (mirror.get('host').get('embed_suffix') if mirror.get('host').get('embed_suffix') is not None else ''), res = mirror.get('quality')))]
+                )for mirror in mirrors if not ((mirror.get('host').get('name') == "Vidstreaming") or (mirror.get('host').get('name') == "Drive.g") or (mirror.get('host').get('name') == "Openload"))
+            ]
+    else:
+        videoMirrors = JSON.ObjectFromString(Regex(REGEX_videos).search(page_data).group())
+        return[
+            MediaObject(
+                optimized_for_streaming=True,
+                container=Container.MP4,
+                audio_channels=2,
+                video_codec=VideoCodec.H264,
+                audio_codec=AudioCodec.AAC,
+                video_resolution = mirror.get('res'),
+                parts = [PartObject(key=Callback(PlayVideo, url = mirror.get('src')))]
+            )for mirror in videoMirrors
+        ]
+
+
+######################################################################################
+
+@indirect
+def PlayVideo(url, res = '720'):
+
+
+    if url.find('masterani.me/v/') >= 0:
+        Log("File url: " + url)
+        return IndirectResponse(VideoClipObject, key=url)
+
+
+    page_data = HTML.ElementFromURL(url)
+    page_string= HTML.StringFromElement(page_data)
+
+
+    if page_string.find("mp4upload") >= 0:
+        url = REGEX_MP4UPLOAD.search(page_string).group()
+        Log("File url: " + url)
+        return IndirectResponse(VideoClipObject, key=url)
+
+    elif page_string.find("vidstreaming") >= 0:
+        url = Regex('(?<=<source src=\')https:.*(?=\' type=\'video\/mp4\' label=\'{res}\'\/>)'.format(res = res)).search(page_string).group()
+        Log("File url: " + url)
+        return IndirectResponse(VideoClipObject, key=url)
+
+    elif page_string.find("openload") >= 0:
+        url = openload.decode_openload(page_string)
+        Log("File url: " + url)
+        return IndirectResponse(VideoClipObject, key=url)
+
+    elif page_string.find("Google Inc") >= 0:
+        vidId = Regex('(?<=file\/d\/).+(?=\/preview)').search(page_string).group()
+        download_page_data = HTML.StringFromElement(HTML.ElementFromURL('https://drive.google.com/uc?id={vidId}'.format(vidId = vidId)))
+        confirm = Regex('(?<=download&amp;confirm=).+(?=&amp;id=)').search(download_page_data).group()
+        url = 'https://drive.google.com/uc?export=download&confirm={confirm}&id={vidId}'.format(vidId = vidId, confirm = confirm)
+        Log("File url: " + url)
+        return IndirectResponse(VideoClipObject, key=url)
+    else:
+        Log("Something went wrong")
