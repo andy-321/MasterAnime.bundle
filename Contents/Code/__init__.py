@@ -40,8 +40,9 @@ def MainMenu():
             key=Callback(CategoryMenu, title = title, url = url), title=title,
             )
         )
-        shows = JSON.ObjectFromURL(BASE_URL + url)
-        anime = shows[0].get('anime')
+    oc.add(InputDirectoryObject(
+        key=Callback(Search), title='Search', prompt='Search...'
+        ))
 
     return oc
 
@@ -142,6 +143,36 @@ def EpisodeMenu(title, UrlID):
             index = int(info.get('episode')) if info.get('episode') is not None else None,
             thumb = Resource.ContentsOfURLWithFallback(url = 'https://cdn.masterani.me/episodes/{thumb}'.format(thumb=episode.get('thumbnail')), fallback='icon-cover.png'),
             url= BASE_URL+'/anime/watch/{slug}/{episode}'.format(slug = show.get('info').get('slug'), episode = info.get('episode'))
+        ))
+
+    return oc
+
+####################################################################################################
+
+@route(PREFIX + "/search")
+def Search(query, page = 1):
+    if len(query) > 30:
+        Log.Error('Search query of length={length} is too long. Must be less than 30 characters'.format(length = len(query)))
+        return ObjectContainer(header='Error', message='The search can not be greater than 30 characters.')
+    oc = ObjectContainer(title1 = query)
+    try:
+        results = JSON.ObjectFromURL(BASE_URL + '/api/anime/filter?search={query}&order=score_desc&page={page}'.format(query = query, page = page), cacheTime = CACHE_1MINUTE)
+    except:
+        Log.Error('No search results found for {query}.'.format(query = query))
+        return ObjectContainer(header='Error', message='No search results found')
+    for show in results.get('data'):
+        showTitle = show.get('title')
+        id = show.get('id')
+        showPoster = show.get('poster').get('file')
+        oc.add(DirectoryObject(
+            key = Callback(TVShowMenu, title=showTitle, UrlID=id),
+            title = showTitle,
+            thumb = Resource.ContentsOfURLWithFallback(url = 'https://cdn.masterani.me/poster/{poster}'.format(poster=showPoster), fallback='icon-cover.png')#,
+        ))
+    if int(page) < int(results.get('last_page')):
+        oc.add(DirectoryObject(
+            key = Callback(Search, query = query, page = int(page)+1),
+            title = 'Next Page'
         ))
 
     return oc
