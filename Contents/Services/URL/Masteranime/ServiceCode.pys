@@ -1,6 +1,7 @@
 
 ######################################################################################
 from random import randint
+from openload import OpenloadStreamFromURL
 
 REGEX_args = '(?<=var args = ).+(?=\s*<\/script>)'
 REGEX_videos = '(?<=var videos = ).+(?=\s*videojs)'
@@ -65,7 +66,7 @@ def MediaObjectsForURL(url):
                 audio_codec = AudioCodec.AAC,
                 video_resolution = mirror.get('quality'),
                 parts = [PartObject(key=Callback(PlayVideo, url = mirror.get('host').get('embed_prefix') + mirror.get('embed_id')+ (mirror.get('host').get('embed_suffix') if mirror.get('host').get('embed_suffix') is not None else ''), res = mirror.get('quality')))]
-                )for mirror in mirrors if not ((mirror.get('host').get('name') == "Vidstreaming") or (mirror.get('host').get('name') == "Drive.g") or (mirror.get('host').get('name') == "Openload"))
+                )for mirror in mirrors if not ((mirror.get('host').get('name') == "Vidstreaming") or (mirror.get('host').get('name') == "Drive.g"))
             ]
     else:
         videoMirrors = JSON.ObjectFromString(Regex(REGEX_videos).search(page_data).group())
@@ -107,10 +108,28 @@ def PlayVideo(url, res = '720'):
         Log("File url: " + url)
         return IndirectResponse(VideoClipObject, key=url)
 
-    elif page_string.find("openload") >= 0:
-        url = openload.decode_openload(page_string)
-        Log("File url: " + url)
-        return IndirectResponse(VideoClipObject, key=url)
+    elif url.find("openload") >= 0:
+        #from https://github.com/Twoure/UnSupportedServices.bundle/blob/master/Contents/Service%20Sets/com.plexapp.plugins.openload/URL/Openload/ServiceCode.pys
+        USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
+        RE_NORM = Regex(r'(https?://\w+\.\w+)/\w+/([^/]+)(/.+)?')
+        FALLBACK = 'http://i.imgur.com/75YO83o.jpg'
+        http_headers = {'User-Agent': USER_AGENT, 'Referer': url}
+        ourl = OpenloadStreamFromURL(url, http_headers=http_headers)
+        if ourl:
+            vurl = None
+            try:
+                page = HTTP.Request(ourl, headers=http_headers, follow_redirects=False, method='HEAD').content
+                vurl = ourl
+            except Ex.RedirectError, e:
+                if 'Location' in e.headers:
+                    vurl = e.headers['Location']
+                elif 'location' in e.headers:
+                    vurl = e.headers['location']
+
+            if vurl:
+                Log.Debug(u"* PlayVideo URL  = {0}".format(vurl))
+                return IndirectResponse(VideoClipObject, key=vurl)
+
 
     elif page_string.find("Google Inc") >= 0:
         vidId = Regex('(?<=file\/d\/).+(?=\/preview)').search(page_string).group()
