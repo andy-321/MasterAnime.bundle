@@ -2,10 +2,12 @@
 ######################################################################################
 from random import randint
 from openload import OpenloadStreamFromURL
+from unpacker import unpack
 
 REGEX_args = '(?<=var args = ).+(?=\s*<\/script>)'
 REGEX_videos = '(?<=var videos = ).+(?=\s*videojs)'
-REGEX_MP4UPLOAD = Regex('(?<="file": ")https:.*(?=")')
+REGEX_MP4UPLOAD = Regex('(?<=<script type="text\/javascript">).+(?=\s*<\/script>)')
+REGEX_MP4UPLOAD_UNPACKED = Regex('(?<=myVideo\.src\(\[{type:"video\/mp4",src:").+(?="}]\);)')
 
 BASE_URL = "https://www.masterani.me"
 
@@ -99,7 +101,9 @@ def PlayVideo(url, res = '720'):
 
 
     if page_string.find("mp4upload") >= 0:
-        url = REGEX_MP4UPLOAD.search(page_string).group()
+        packed = REGEX_MP4UPLOAD.search(page_string).group()
+        unpacked = unpack(packed)
+        url = REGEX_MP4UPLOAD_UNPACKED.search(unpacked).group()
         Log("File url: " + url)
         return IndirectResponse(VideoClipObject, key=url)
 
