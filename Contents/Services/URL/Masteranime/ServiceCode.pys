@@ -23,7 +23,10 @@ def MetadataObjectForURL(url):
     show = JSON.ObjectFromURL(BASE_URL + '/api/anime/{id}/detailed'.format(id=id))
     #rand = randint(0,show.get('wallpapers').length)
     #show_art = ("https://cdn.masterani.me/wallpaper/0/" + show.get('wallpapers')[rand].get('file'))
-    show_art = ("https://cdn.masterani.me/wallpaper/0/" + show.get('wallpapers')[0].get('file'))
+    if (show.get('info').get('wallpaper_id') is not None):
+        show_art = ("https://cdn.masterani.me/wallpaper/0/" + show.get('wallpapers')[0].get('file'))
+    else:
+        show_art = None
     show_rating = float(show.get('info').get('score')) * 2
     episode = show.get('episodes')[episodeNum-1]
     show_summary = episode.get('info').get('description')
