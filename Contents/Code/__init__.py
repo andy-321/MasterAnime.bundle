@@ -105,6 +105,13 @@ def TVShowMenu(title, UrlID):
         duration = int(show.get('info').get('episode_length')) * 60000 if show.get('info').get('episode_length') is not None else None,
         content_rating  = show.get('info').get('age_rating')
     ))
+    ytTrailerID = show.get('info').get('youtube_trailer_id')
+    if(ytTrailerID is not None):
+        oc.add(EpisodeObject(
+            title='Trailer: ' + title,
+            url='https://www.youtube.com/watch?v={id}'.format(id=ytTrailerID),
+            thumb = R('trailer-cover.png')
+        ))
     if(show.get('franchise_count') > 0):
         franchise = JSON.ObjectFromURL(BASE_URL+'/api/anime/{id}/franchise'.format(id=UrlID))
         oc.add(DirectoryObject(
