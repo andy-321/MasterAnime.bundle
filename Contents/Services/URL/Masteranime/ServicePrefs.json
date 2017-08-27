@@ -1,0 +1,8 @@
+[
+  {
+    "id": "showTrailer",
+    "label": "Show trailer",
+    "type": "bool",
+    "default": "false"
+  }
+]

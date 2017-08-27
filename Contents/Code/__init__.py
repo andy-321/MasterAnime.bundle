@@ -106,7 +106,7 @@ def TVShowMenu(title, UrlID):
         content_rating  = show.get('info').get('age_rating')
     ))
     ytTrailerID = show.get('info').get('youtube_trailer_id')
-    if(ytTrailerID is not None):
+    if(ytTrailerID is not None and Prefs['showTrailer']):
         oc.add(EpisodeObject(
             title='Trailer: ' + title,
             url='https://www.youtube.com/watch?v={id}'.format(id=ytTrailerID),
