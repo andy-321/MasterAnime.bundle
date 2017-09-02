@@ -71,7 +71,7 @@ def MediaObjectsForURL(url):
                 audio_codec = AudioCodec.AAC,
                 video_resolution = mirror.get('quality'),
                 parts = [PartObject(key=Callback(PlayVideo, url = mirror.get('host').get('embed_prefix') + mirror.get('embed_id')+ (mirror.get('host').get('embed_suffix') if mirror.get('host').get('embed_suffix') is not None else ''), res = mirror.get('quality')))]
-                )for mirror in mirrors if not ((mirror.get('host').get('name') == "Vidstreaming") or (mirror.get('host').get('name') == "Drive.g"))
+                )for mirror in mirrors if not ((mirror.get('host').get('name') == "Vidstreaming") or (mirror.get('host').get('name') == "Drive.g") or (mirror.get('host').get('name') == "Streamango"))
             ]
     else:
         videoMirrors = JSON.ObjectFromString(Regex(REGEX_videos).search(page_data).group())
