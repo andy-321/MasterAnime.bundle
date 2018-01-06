@@ -1,0 +1,15 @@
+#!/usr/bin/env python
+
+import requests
+
+headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_8_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36'}
+
+def StringFromURL(url):
+    #assuming gets for now
+    request = requests.get(url, headers=headers)
+    resultBody = request.content
+    return resultBody
+
+def GetRedirectURL(url):
+    request = requests.get(url, headers=headers)
+    return request.url

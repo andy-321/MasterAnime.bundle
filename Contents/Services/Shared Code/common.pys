@@ -1,0 +1,13 @@
+#!/usr/bin/env python
+
+#https://forums.plex.tv/discussion/265276/url-services-useless-for-more-complex-cases
+
+import os, sys
+
+TITLE = 'Masteranime'
+
+# setup libraries context
+BUNDLE = os.path.join(os.getcwd().lstrip('\\\?').split('Plug-in Support')[0], 'Plug-ins', TITLE + '.bundle')
+LIBS = os.path.join(BUNDLE, 'Contents', 'Libraries', 'Shared')
+if LIBS not in sys.path:
+    sys.path.append(LIBS)

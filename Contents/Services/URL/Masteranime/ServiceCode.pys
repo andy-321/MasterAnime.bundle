@@ -1,15 +1,17 @@
 
 ######################################################################################
 from random import randint
+import common as Common
 from openload import OpenloadStreamFromURL
 from unpacker import unpack
+from networking import StringFromURL, GetRedirectURL
 
 REGEX_args = '(?<=var args = ).+(?=\s*<\/script>)'
 REGEX_videos = '(?<=var videos = ).+(?=\s*videojs)'
 REGEX_MP4UPLOAD = Regex('(?<=<script type="text\/javascript">).+(?=\s*<\/script>)')
 REGEX_MP4UPLOAD_UNPACKED = Regex('(?<=myVideo\.src\(\[{type:"video\/mp4",src:").+(?="}]\);)')
 
-BASE_URL = "https://www.masterani.me"
+BASE_URL = "http://www.masterani.me"
 
 
 
@@ -20,11 +22,13 @@ def MetadataObjectForURL(url):
     Log('Getting metadata for :' + url)
     id = Regex('(?<=watch\/)\d+(?=-)').search(url).group()
     episodeNum = int(Regex('(?<=\/)\d+$').search(url).group())
-    show = JSON.ObjectFromURL(BASE_URL + '/api/anime/{id}/detailed'.format(id=id))
+    showString = StringFromURL(BASE_URL + '/api/anime/{id}/detailed'.format(id=id))
+    show = JSON.ObjectFromString(showString)
+    #show = JSON.ObjectFromURL(BASE_URL + '/api/anime/{id}/detailed'.format(id=id))
     #rand = randint(0,show.get('wallpapers').length)
-    #show_art = ("https://cdn.masterani.me/wallpaper/0/" + show.get('wallpapers')[rand].get('file'))
+    #show_art = ("http://cdn.masterani.me/wallpaper/0/" + show.get('wallpapers')[rand].get('file'))
     if (show.get('info').get('wallpaper_id') is not None):
-        show_art = ("https://cdn.masterani.me/wallpaper/0/" + show.get('wallpapers')[0].get('file'))
+        show_art = ("http://cdn.masterani.me/wallpaper/0/" + show.get('wallpapers')[0].get('file'))
     else:
         show_art = None
     show_rating = float(show.get('info').get('score')) * 2
@@ -34,7 +38,7 @@ def MetadataObjectForURL(url):
     show_date = Datetime.ParseDate(episode.get('info').get('aired')) if episode.get('info').get('aired') is not None else Datetime.ParseDate(show.get('info').get('started_airing_date'))
     duration = int(episode.get('info').get('duration')) * 60000 if episode.get('info').get('duration') is not None else int(show.get('info').get('episode_length')) * 60000
     #Resource.ContentsOfURLWithFallback([, fallback]),
-    show_thumb = ("https://cdn.masterani.me/episodes/" + episode.get('thumbnail')) if episode.get('thumbnail') is not None else 'icon-cover.png'
+    show_thumb = ("http://cdn.masterani.me/episodes/" + episode.get('thumbnail')) if episode.get('thumbnail') is not None else 'icon-cover.png'
     return EpisodeObject(
         title = ep_title,
         show = show.get('info').get('title'),
@@ -51,12 +55,13 @@ def MetadataObjectForURL(url):
 ######################################################################################
 
 def MediaObjectsForURL(url):
-
-    page_data = HTML.StringFromElement(HTML.ElementFromURL(url))
+    page_data = StringFromURL(url)
+    #page_data = HTML.StringFromElement(HTML.ElementFromURL(url))
     jsonString = Regex(REGEX_args).search(page_data).group()
     Log(jsonString)
     jsonStringFixed = jsonString.replace('anime: {', '"anime:": {').replace('mirrors: [', '"mirrors": [').replace('auto_update: [', '"auto_update": [')
     Log("Fixing json string: " + jsonStringFixed)
+
     sources = JSON.ObjectFromString(jsonStringFixed)
     mirrors = sources.get('mirrors')
 
@@ -71,7 +76,7 @@ def MediaObjectsForURL(url):
                 audio_codec = AudioCodec.AAC,
                 video_resolution = mirror.get('quality'),
                 parts = [PartObject(key=Callback(PlayVideo, url = mirror.get('host').get('embed_prefix') + mirror.get('embed_id')+ (mirror.get('host').get('embed_suffix') if mirror.get('host').get('embed_suffix') is not None else ''), res = mirror.get('quality')))]
-                )for mirror in mirrors if not ((mirror.get('host').get('name') == "Vidstreaming") or (mirror.get('host').get('name') == "Drive.g") or (mirror.get('host').get('name') == "Streamango"))
+                )for mirror in mirrors if not ((mirror.get('host').get('name') == "Vidstreaming") or (mirror.get('host').get('name') == "Drive.g") or (mirror.get('host').get('name') == "Streamango") or (mirror.get('host').get('name') == "Stream.moe"))
             ]
     else:
         videoMirrors = JSON.ObjectFromString(Regex(REGEX_videos).search(page_data).group())
@@ -98,9 +103,11 @@ def PlayVideo(url, res = '720'):
         Log("File url: " + url)
         return IndirectResponse(VideoClipObject, key=url)
 
-
-    page_data = HTML.ElementFromURL(url)
-    page_string= HTML.StringFromElement(page_data)
+    raw_page_string = StringFromURL(url)
+    page_data = HTML.ElementFromString(raw_page_string)
+    page_string = HTML.StringFromElement(page_data)
+    #page_data = HTML.ElementFromURL(url)
+    #page_string = HTML.StringFromElement(page_data)
 
 
     if page_string.find("mp4upload") >= 0:
@@ -111,28 +118,29 @@ def PlayVideo(url, res = '720'):
         return IndirectResponse(VideoClipObject, key=url)
 
     elif page_string.find("vidstreaming") >= 0:
-        url = Regex('(?<=<source src=\')https:.*(?=\' type=\'video\/mp4\' label=\'{res}\'\/>)'.format(res = res)).search(page_string).group()
+        url = Regex('(?<=<source src=\')http:.*(?=\' type=\'video\/mp4\' label=\'{res}\'\/>)'.format(res = res)).search(page_string).group()
         Log("File url: " + url)
         return IndirectResponse(VideoClipObject, key=url)
 
     elif url.find("openload") >= 0:
-        #from https://github.com/Twoure/UnSupportedServices.bundle/blob/master/Contents/Service%20Sets/com.plexapp.plugins.openload/URL/Openload/ServiceCode.pys
+        #from http://github.com/Twoure/UnSupportedServices.bundle/blob/master/Contents/Service%20Sets/com.plexapp.plugins.openload/URL/Openload/ServiceCode.pys
         USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'
-        RE_NORM = Regex(r'(https?://\w+\.\w+)/\w+/([^/]+)(/.+)?')
+        RE_NORM = Regex(r'(http?://\w+\.\w+)/\w+/([^/]+)(/.+)?')
         FALLBACK = 'http://i.imgur.com/75YO83o.jpg'
         http_headers = {'User-Agent': USER_AGENT, 'Referer': url}
         ourl = OpenloadStreamFromURL(url, http_headers=http_headers)
         if ourl:
             vurl = None
-            try:
-                page = HTTP.Request(ourl, headers=http_headers, follow_redirects=False, method='HEAD').content
-                vurl = ourl
-            except Ex.RedirectError, e:
-                if 'Location' in e.headers:
-                    vurl = e.headers['Location']
-                elif 'location' in e.headers:
-                    vurl = e.headers['location']
+            #try:
+            #    page = HTTP.Request(ourl, headers=http_headers, follow_redirects=False, method='HEAD').content
+            #    vurl = ourl
+            #except Ex.RedirectError, e:
+            #    if 'Location' in e.headers:
+            #        vurl = e.headers['Location']
+            #    elif 'location' in e.headers:
+            #        vurl = e.headers['location']
 
+            vurl = GetRedirectURL(ourl)
             if vurl:
                 Log.Debug(u"* PlayVideo URL  = {0}".format(vurl))
                 return IndirectResponse(VideoClipObject, key=vurl)
@@ -140,9 +148,11 @@ def PlayVideo(url, res = '720'):
 
     elif page_string.find("Google Inc") >= 0:
         vidId = Regex('(?<=file\/d\/).+(?=\/preview)').search(page_string).group()
-        download_page_data = HTML.StringFromElement(HTML.ElementFromURL('https://drive.google.com/uc?id={vidId}'.format(vidId = vidId)))
+        urlString = StringFromURL('http://drive.google.com/uc?id={vidId}'.format(vidId = vidId))
+        download_page_data = urlString
+        #download_page_data = HTML.StringFromElement(HTML.ElementFromURL('http://drive.google.com/uc?id={vidId}'.format(vidId = vidId)))
         confirm = Regex('(?<=download&amp;confirm=).+(?=&amp;id=)').search(download_page_data).group()
-        url = 'https://drive.google.com/uc?export=download&confirm={confirm}&id={vidId}'.format(vidId = vidId, confirm = confirm)
+        url = 'http://drive.google.com/uc?export=download&confirm={confirm}&id={vidId}'.format(vidId = vidId, confirm = confirm)
         Log("File url: " + url)
         return IndirectResponse(VideoClipObject, key=url)
     else:
